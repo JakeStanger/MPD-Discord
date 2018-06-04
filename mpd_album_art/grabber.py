@@ -50,7 +50,7 @@ class Grabber:
         Directory MPD is currently playing from.
     :param str link_path:
         Path to symlink to current image file. By default,
-        ``os.path.join(save_dir, "current")``
+        ``os.path.join(save_dir, "current.png")``
 
     Construct a Grabber with ``save_dir = ~/.covers``:
 
@@ -77,7 +77,7 @@ class Grabber:
 
         if link_path is None:
             link_path = os.path.join(save_dir, "current.png")
-        self.link_path = link_path
+        self.link_path = os.path.join(save_dir, link_path)
 
         self._quiet = quiet
 

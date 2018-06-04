@@ -1,6 +1,5 @@
 from mpd_album_art import Grabber
-
-from mpd import MPDClient
+from PersistantMPDClient import PersistentMPDClient
 
 import argparse
 import os
@@ -26,7 +25,7 @@ def main():
             sys.stderr.write(msg)
 
     # initialize MPD client
-    mpd_client = MPDClient()
+    mpd_client = PersistentMPDClient()
 
     grabber = Grabber(save_dir=args.art_dir, library_dir=args.music_dir,
                       link_path=os.path.join(args.art_dir, args.link_name),

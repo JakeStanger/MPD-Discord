@@ -1,19 +1,35 @@
-import discord
-import asyncio
 import json
+from typing import Union
+
+import discord
+from discord.voice_client import StreamPlayer
+
 import commands as bot_commands
+import constants
 
 client = discord.Client()
+player: StreamPlayer = None
+voice = None
 
 commands = {}
 aliases = {}
 
 
 def generate_help(*args):
-    return ''.join(commands[command].get_help() for command in commands)
+    embed = discord.Embed(color=0xff000a, title='Help',
+                          description='')
+
+    for command in commands:
+        c = commands[command]
+        embed.add_field(name=c.get_name(),
+                        value=c.get_description() + "\n**Aliases:** " + ', '.join(a for a in c.get_aliases()) + "\n--")
+
+    return {'embed': embed}, None, None
 
 
 class Command:
+    # _function: Callable[Any, dict]
+
     def __init__(self, name: str, command_aliases: list, description: str):
         self._name = name
         self._aliases = command_aliases
@@ -65,7 +81,7 @@ def get_settings():
     return settings
 
 
-def get_command_by_name(name: str) -> Command:
+def get_command_by_name(name: str) -> Union[Command, None]:
     name = name.split(' ')[0]
     if name in commands:
         return commands[name]
@@ -91,11 +107,100 @@ async def on_message(message):
         arguments = command_input.split(' ')[1:]
 
         if command:
-            return_message = command.run(arguments)
-            print(*return_message)
-            await client.send_message(message.channel,
-                                      content=return_message['message'] if 'message' in return_message else None,
-                                      embed=return_message['embed'] if 'embed' in return_message else None)
+            import mpd_utils
+            mpd_utils.establish_mpd_connection()  # Establish connection to MPD if we do not have one
+
+            return_message, extras, post_action = command.run(message, arguments)
+            msg = await client.send_message(message.channel,
+                                            content=return_message['message'] if 'message' in return_message else None,
+                                            embed=return_message['embed'] if 'embed' in return_message else None)
+
+            if extras:
+                for key in extras:
+                    if key != 'data' and extras[key]:
+                        await globals()[key](msg, extras['data'], post_action)
+
+            # if not mpd_utils.streaming:
+            #     mpd_utils.close_mpd_connection()
+
+
+async def get_reactions(num, alphabet):
+    for letter in alphabet[:num]:
+        yield letter
+
+
+async def wait_for_reactions(message, data, post_action):
+    emoji_alphabet = [i for i in range(constants.UNICODE_A_VALUE, constants.UNICODE_Z_VALUE)]
+
+    async for letter in get_reactions(len(data), emoji_alphabet):
+        await client.add_reaction(message, chr(letter))
+
+    valid = False
+    while not valid:
+        res = await client.wait_for_reaction(message=message)
+        if res.user != message.author:
+            react_emoji = res.reaction.emoji
+            emoji_value = ord(react_emoji)
+
+            if emoji_value in emoji_alphabet:
+                try:
+                    song = data[emoji_alphabet.index(emoji_value)]
+                    await client.delete_message(message)
+
+                    import utils
+
+                    await post_action(client, message, song)
+                    # await client.send_message(message.channel, embed=utils.send_song_embed(song))
+
+                    valid = True
+                except ValueError:
+                    await client.remove_reaction(message, react_emoji, res.user)
+            else:
+                await client.remove_reaction(message, react_emoji, res.user)
+
+
+async def join_voice(message, data, post_action):
+    if client.is_voice_connected(message.server):
+        await client.edit_message(message, "Already in voice.")
+        return
+
+    global player
+    global voice
+
+    voice = await client.join_voice_channel(data)
+
+    import mpd_utils
+    mpd_utils.streaming = True
+
+    import utils
+    player = utils.create_player(voice)
+    player.start()
+    mpd_utils.start_playback()
+
+    await client.edit_message(message, message.content.replace("Joining", "Joined").replace("...", "."))
+
+
+async def toggle_playback(message, data, post_action):
+    global player
+    global voice
+
+    import mpd_utils
+
+    if client.is_voice_connected(message.server):
+        current_playlist = mpd_utils.get_current_playlist()
+        if current_playlist:
+            is_paused = mpd_utils.is_paused()
+
+            mpd_utils.toggle_playback(not is_paused)
+
+            msg = "Unpaused." if is_paused else "Paused."
+        else:
+            msg = "You cannot do that with an empty playlist."
+    else:
+        msg = "Playback cannot be toggled if I am not connected."
+        mpd_utils.pause_playback()  # Pause playback just to make sure.
+
+    await client.edit_message(message, msg)
 
 
 if __name__ == '__main__':

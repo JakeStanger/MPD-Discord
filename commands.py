@@ -1,124 +1,62 @@
-import functools
-
 import discord
-from mpd import MPDClient
-from datetime import timedelta
-import mpd_album_art
 
-mpd_connection = None
+import mpd_utils
 
 
-def establish_mpd_connection():
-    global mpd_connection
-    if mpd_connection:
-        return
+def get_playing(msg, args):
+    song = mpd_utils.get_current_song()
+    if len(song) == 0:
+        embed = discord.Embed(title="Nothing playing.", color=0xff4444)
+        return {'embed': embed}, None, None
 
-    import main
-    settings = main.get_settings()
-
-    mpd_connection = MPDClient()
-
-    mpd_settings = settings['mpd']
-
-    mpd_connection.timeout = mpd_settings['timeout']
-    mpd_connection.connect(mpd_settings['server'], mpd_settings['port'])
+    import utils
+    return {'embed': utils.get_song_embed(song)}, None, None
 
 
-def close_mpd_connection():
-    global mpd_connection
-    mpd_connection.close()
-    mpd_connection.disconnect()
-    mpd_connection = None
+def search(msg, query):
+    results = mpd_utils.perform_search(query)
+
+    import utils
+    return {'embed': utils.get_results_embed(results)}, \
+           {'wait_for_reactions': True, 'data': results}, utils.send_song_embed
 
 
-def requires_mpd():
-    def wrapper(func):
-        @functools.wraps(func)
-        def wrapped(*args):
-            try:
-                establish_mpd_connection()
-                return func(*args)
-            finally:
-                close_mpd_connection()
+def add(msg, query):
+    results = mpd_utils.perform_search(query)
 
-        return wrapped
-
-    return wrapper
+    import utils
+    return {'embed': utils.get_results_embed(results)}, \
+           {'wait_for_reactions': True, 'data': results}, mpd_utils.add_to_queue
 
 
-def generate_query(query):
-    QUERY_TYPES = [
-        'artist',
-        'album',
-        'title',
-        'track',
-        'name',
-        'genre',
-        'date',
-        'composer',
-        'performer',
-        'comment',
-        'disc',
-        'filename',
-        'any']
+def playlist(msg, args):
+    results = mpd_utils.get_current_playlist()
 
-    query_dict = {}
-    key = 'any'
-    for word in query:
-        if any(t in word for t in QUERY_TYPES):
-            key = word.split(':')[0]
-            word = word.split(':')[1]
-
-        if key in query_dict:
-            query_dict[key] += ' ' + word
-        else:
-            query_dict[key] = word
-
-    return [item for k in query_dict for item in (k, query_dict[k])]
+    import utils
+    return {'embed': utils.get_results_embed(results, title="Current Playlist", empty="Empty.")}, None, None
 
 
-@requires_mpd()
-def get_playing(args):
-    current_song = mpd_connection.currentsong()
-    if len(current_song) == 0:
-        return {'message': "Nothing playing."}
+def join(msg, args):
+    connected_channel = msg.author.voice.voice_channel
 
-    import main
-    settings = main.get_settings()
-    grabber_settings = settings['mpd']['art_grabber']
+    action = None
+    if connected_channel:
+        message = "Joining **%s**..." % connected_channel.name
+        action = {'join_voice': True, 'data': connected_channel}
 
-    grabber = mpd_album_art.Grabber(
-        save_dir=grabber_settings['save_dir'],
-        library_dir=grabber_settings['library_dir']
-    )
-
-    grabber.get_local_art(current_song)
-
-    # message = 'Currently playing: **%s** - **%s** by **%s**.' \
-    #           % (current_song['title'], current_song['album'], current_song['artist']) \
-    #     if len(current_song) > 0 else "Nothing."
-
-    embed = discord.Embed(color=0xff0ff, title=current_song['title'],
-                          description=current_song['album'] + " - " + current_song['artist'])
-
-    IMAGE_URL = 'https://files.jakestanger.com/mpd/current.png'  # TODO Add to config
-    embed.set_thumbnail(url=IMAGE_URL)
-
-    return {'embed': embed}
+    else:
+        message = "You must be in a voice channel to do that."
+    return {"message": message}, action, None
 
 
-@requires_mpd()
-def search(query):
-    results = mpd_connection.search(*(entry for entry in generate_query(query)))
+def pause(msg, args):
+    connected_channel = msg.author.voice.voice_channel
 
-    SEARCH_RESULTS = 15  # TODO Include in query
-    if len(results) > SEARCH_RESULTS:
-        results = results[:SEARCH_RESULTS]
+    action = None
+    if connected_channel:
+        message = "Toggling playback..."
+        action = {'toggle_playback': True, 'data': mpd_utils.is_paused()}
+    else:
+        message = "You must be in a voice channel to do that."
 
-    message = ''.join('**%s** - **%s** by **%s**. (%s)\n'
-                      % (
-                          song['title'], song['album'], song['artist'],
-                          timedelta(seconds=round(float(song['duration']))))
-                      for song in results) if len(results) > 0 else "No results."
-
-    return {'message': message}
+    return {"message": message}, action, None
