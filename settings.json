@@ -1,0 +1,52 @@
+{
+  "token": "",
+  "prefix": "+",
+  "mpd": {
+    "server": "localhost",
+    "port": 6600,
+    "timeout": 10,
+    "fifo": "/var/mpd.fifo",
+    "art_grabber": {
+      "save_dir": "/var/www/files/public_html/mpd",
+      "library_dir": ""
+    }
+  },
+  "download_servers": {
+    "art_url": "",
+    "music_url": ""
+  },
+  "commands": {
+    "help": {
+      "aliases": ["assist", "commands"],
+      "description": "Lists commands, their aliases, and their function."
+    },
+    "get_playing": {
+      "aliases": ["playing", "current_song", "now_playing", "np"],
+      "description": "Gets the currently playing song."
+    },
+    "search": {
+      "aliases": ["lookup", "query"],
+      "description": "Searches the database for a song."
+    },
+    "add": {
+      "aliases": ["queue", "search_add", "add_one"],
+      "description": "Searches the database for a song and adds it to the queue."
+    },
+    "playlist": {
+      "aliases": ["current_playlist", "queue", "cp"],
+      "description": "Displays the songs in the current queue."
+    },
+    "join": {
+      "aliases": ["voice", "connect"],
+      "description": "Joins the voice channel of the user who executed the command."
+    },
+    "pause": {
+      "aliases": ["play", "toggle", "p"],
+      "description": "Pauses the player."
+    },
+    "leave": {
+      "aliases": ["disconnect"],
+      "description": "Disconnects from the current voice channel."
+    }
+  }
+}
