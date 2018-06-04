@@ -7,7 +7,7 @@
     "timeout": 10,
     "fifo": "/var/mpd.fifo",
     "art_grabber": {
-      "save_dir": "/var/www/files/public_html/mpd",
+      "save_dir": "",
       "library_dir": ""
     }
   },
