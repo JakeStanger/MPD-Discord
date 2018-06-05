@@ -45,7 +45,7 @@ def join(msg, args):
         action = {'join_voice': True, 'data': connected_channel}
 
     else:
-        message = "You must be in a voice channel to do that."
+        message = "You must be in a voice channel to do that."  # TODO Create decoration to handle voice channel requirement
     return {"message": message}, action, None
 
 
@@ -56,6 +56,19 @@ def pause(msg, args):
     if connected_channel:
         message = "Toggling playback..."
         action = {'toggle_playback': True, 'data': mpd_utils.is_paused()}
+    else:
+        message = "You must be in a voice channel to do that."
+
+    return {"message": message}, action, None
+
+
+def leave(msg, args):
+    connected_channel = msg.author.voice.voice_channel
+
+    action = None
+    if connected_channel:
+        message = "Leaving..."
+        action = {'leave_voice': True, 'data': None}
     else:
         message = "You must be in a voice channel to do that."
 

@@ -1,3 +1,4 @@
+import asyncio
 import json
 from typing import Union
 
@@ -201,6 +202,28 @@ async def toggle_playback(message, data, post_action):
         mpd_utils.pause_playback()  # Pause playback just to make sure.
 
     await client.edit_message(message, msg)
+
+
+async def leave_voice(message, data, post_action):
+    global voice
+    if voice:
+        await voice.disconnect()
+        await client.delete_message(message)
+
+
+@client.event
+async def on_voice_state_update(before, after):
+    event_channel = before.voice.voice_channel
+    if not any(vc.channel == event_channel for vc in client.voice_clients):
+        return
+
+    if len(event_channel.voice_members) == 1:
+        # Wait in case somebody rejoins
+        await asyncio.sleep(10)
+
+        # If still empty, disconnect.
+        if len(event_channel.voice_members) == 1:
+            await voice.disconnect()
 
 
 if __name__ == '__main__':

@@ -45,7 +45,8 @@ def start_playback():
     if current_state == 'pause':
         mpd_connection.pause(0)
     elif current_state == 'stop':
-        mpd_connection.play(0)
+        if len(mpd_connection.playlist()) > 0:
+            mpd_connection.play(0)
 
 
 def pause_playback():
